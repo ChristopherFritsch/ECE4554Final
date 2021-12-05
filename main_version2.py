@@ -13,7 +13,8 @@ def loadImages(path):
     return imgs
 
 def preprocessing(img):
-    return img
+    norm = cv2.normalize(img)
+    return norm
 
 def calcGrad(img):
     """
@@ -229,6 +230,16 @@ def normHist(hist_vector, cell_size, img_height, img_width):
     return descriptor
 
 def trainSvm(X_train, y_train):
+    """
+    Train a support vector machine using the HOG features of an image.
+
+    parameters:
+    X_train - a training set of HOG features
+    y_train - labels for each HOG feature
+
+    Returns: 
+    model - a SVM model for the classification of the images
+    """
     grid = GridSearchCV(LinearSVC(dual=False), {'C': [1.0, 2.0, 4.0, 8.0]}, cv=3)
     grid.fit(X_train, y_train)
     grid.best_score_
@@ -277,7 +288,7 @@ def main():
         descriptor = normHist(hist, cell_size, img.shape[0], img.shape[1])
         features.append(descriptor)
         
-    model = testSvm(features, targets)
+    model = trainSvm(features, targets)
     
 
 if __name__ == "__main__":
