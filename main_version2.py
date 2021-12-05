@@ -277,9 +277,13 @@ def main():
     # hist = calcHist(angle, magnitude, height, width)
     # descriptor = normHist(hist, height, crop.shape[0], crop.shape[1])
     
-    imgs = loadImages("./dataset")
+    knifeImgs = loadImages("./dataset/positive_knife_samples")
+    negativeImgs = loadImages("./dataset/negative_samples")
+    testImgs = loadImages("./dataset/knife_test_samples")
+
+    imgs = knifeImgs + negativeImgs
+    targets = np.ones(len(knifeImgs)) + np.zeros(len(negativeImgs))
     features = []
-    targets = []
     for img in imgs:
         prepro = preprocessing(img)
         angle, magnitude = calcGrad(prepro)
