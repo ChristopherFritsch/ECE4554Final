@@ -52,6 +52,7 @@ def main():
         hist = calcHist(grad)
         features.append(calcHogVec(hist))
 
+    
     model = trainSvm(features, targets)
     
 

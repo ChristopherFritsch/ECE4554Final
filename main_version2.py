@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 import scipy as sp
 from tensorflow import keras
 import cv2
@@ -13,7 +14,7 @@ def loadImages(path):
     return imgs
 
 def preprocessing(img):
-    norm = cv2.normalize(img)
+    norm = img
     return norm
 
 def calcGrad(img):
@@ -249,17 +250,30 @@ def trainSvm(X_train, y_train):
     return model
 
 def testSvm(img, model):
-    prepro = preprocessing(img)
-    angle, magnitude = calcGrad(prepro)
-    cell_size = 5
-    hist = calcHist(angle, magnitude, cell_size)
-    descriptor = normHist(hist, cell_size, img.shape[0], img.shape[1])
-    labels = model.predict(descriptor)
-    return labels
+    patches = sliding_window_view(img, [96, 96])
+    labels = []
+    locs = []
+    for i in range(0, patches.shape[0], 40):
+        for j in range(0, patches.shape[1], 40):
+            prepro = preprocessing(patches[i,j,:,:])
+            angle, magnitude = calcGrad(prepro)
+            cell_size = 5
+            hist = calcHist(angle, magnitude, cell_size)
+            descriptor = np.transpose(normHist(hist, cell_size, prepro.shape[0], prepro.shape[1]))
+            
+            labels.append(model.predict(descriptor))
+            if labels[-1] == 1:
+                locs.append((j,i))
+    
+   
+    return labels, locs
 
 def clickEvent(event,x,y,flags,param):
     if event == cv2.EVENT_LBUTTONDOWN:
         print(x, '  ', y)
+
+def resizeImage(img):
+    return cv2.resize(img, (96, 96))
 
 def testImage(img):
     cv2.imshow('OG Image', img)
@@ -279,20 +293,36 @@ def main():
     
     knifeImgs = loadImages("./dataset/positive_knife_samples")
     negativeImgs = loadImages("./dataset/negative_samples")
+
     testImgs = loadImages("./dataset/knife_test_samples")
 
     imgs = knifeImgs + negativeImgs
-    targets = np.ones(len(knifeImgs)) + np.zeros(len(negativeImgs))
+    targets = np.concatenate((np.ones(len(knifeImgs)), np.zeros(len(negativeImgs))))
     features = []
-    for img in imgs:
-        prepro = preprocessing(img)
+    it = 0
+    for i in range(len(imgs)):
+        print(it)
+        resz = resizeImage(imgs[i])
+        prepro = preprocessing(resz)
         angle, magnitude = calcGrad(prepro)
         cell_size = 5
         hist = calcHist(angle, magnitude, cell_size)
-        descriptor = normHist(hist, cell_size, img.shape[0], img.shape[1])
+        descriptor = normHist(hist, cell_size, resz.shape[0], resz.shape[1])
         features.append(descriptor)
+        it += 1
         
+    features = np.resize(features, [len(features), features[0].size])
     model = trainSvm(features, targets)
+
+    for i in range(len(testImgs)):
+        labels, locs = testSvm(testImgs[i], model)
+        print(labels)
+        for j in range(len(locs)):
+            cv2.rectangle(testImgs[i], locs[j], (locs[j][0] + 96, locs[j][1] + 96), (255,0,0))
+        cv2.imshow("Image", testImgs[i])
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
     
 
 if __name__ == "__main__":
